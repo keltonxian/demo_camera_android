@@ -3,6 +3,7 @@ package com.kelton.demo.camerademo;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -27,6 +28,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -34,7 +36,6 @@ import android.view.Surface;
 import android.view.TextureView;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -52,7 +53,7 @@ import java.util.concurrent.TimeUnit;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class CameraTextureView extends TextureView implements TextureView.SurfaceTextureListener {
 
-    private static final String TAG = "Rios";
+    private static final String TAG = "TEXTURE_VIEW";
 
     private Context _context = null;
     private HandlerThread _backgroundThread = null;
@@ -60,11 +61,9 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     private int _ratioWidth = 0;
     private int _ratioHeight = 0;
 
-    private static final String _saveFileName = "tmpSavePhoto.png";
     private String _savePath = null;
     private File _saveFile = null;
 
-    private CameraManager _cameraManager = null;
     private String _cameraId = null;
     private CameraDevice _cameraDevice = null;
     private Semaphore _cameraOpenCloseLock = new Semaphore(1);
@@ -99,9 +98,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
     private Size _previewSize;
 
-    private boolean isFrontCameraAvailable = false;
-    private boolean isBackCameraAvailable = false;
-
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 270);
@@ -124,11 +120,13 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
+        Log.d(TAG, "onSurfaceTextureAvailable width["+width+"], height["+height+"]");
         openCamera(width, height);
     }
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+        Log.d(TAG, "onSurfaceTextureSizeChanged width["+width+"], height["+height+"]");
         configureTransform(width, height);
     }
 
@@ -163,6 +161,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     }
 
     public void setAspectRatio(int width, int height) {
+        Log.d(TAG, "setAspectRatio size: "+width+","+height);
         if (width < 0 || height < 0) {
             throw new IllegalArgumentException("Size cannot be negative.");
         }
@@ -176,10 +175,11 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
+        Log.d(TAG, "onMeasure: "+_ratioWidth+","+_ratioHeight+","+width+","+height);
         if (0 == _ratioWidth || 0 == _ratioHeight) {
             setMeasuredDimension(width, height);
         } else {
-            if (width < height * _ratioWidth / _ratioHeight) {
+            if (width / height >= _ratioWidth / _ratioHeight) {
                 setMeasuredDimension(width, width * _ratioHeight / _ratioWidth);
             } else {
                 setMeasuredDimension(height * _ratioWidth / _ratioHeight, height);
@@ -188,12 +188,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     }
 
     private void openCamera(int width, int height) {
-        //if targetSdkVersion is 23, need to checkSelfPermission when use a function
-//        if (ContextCompat.checkSelfPermission(this._context, Manifest.permission.CAMERA)
-//                != PackageManager.PERMISSION_GRANTED) {
-//            requestCameraPermission();
-//            return;
-//        }
+        Log.d(TAG, "openCamera size: "+width+","+height);
         setUpCameraOutputs(width, height);
         configureTransform(width, height);
         Activity activity = (Activity)this._context;
@@ -201,6 +196,12 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         try {
             if (!_cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Time out waiting to lock camera opening.");
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // android above M makes some changes in granted permissions on run-time application
+                if (ContextCompat.checkSelfPermission(this._context, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
             }
             manager.openCamera(_cameraId, _deviceStateCallback, _msgHandler);
         } catch (CameraAccessException e) {
@@ -240,8 +241,12 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                 // Find out if we need to swap dimension to get the preview size relative to sensor
                 // coordinate.
                 int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();
-                int sensorOrientation =
-                        characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                Integer sensorOrientationInteger = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                int sensorOrientation = 0;
+                if (null != sensorOrientationInteger)
+                {
+                    sensorOrientation = sensorOrientationInteger;
+                }
                 boolean swappedDimensions = false;
                 switch (displayRotation) {
                     case Surface.ROTATION_0:
@@ -266,12 +271,16 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                 int rotatedPreviewHeight = height;
                 int maxPreviewWidth = displaySize.x;
                 int maxPreviewHeight = displaySize.y;
+                int viewWidth = this.getWidth();
+                int viewHeight = this.getHeight();
 
                 if (swappedDimensions) {
                     rotatedPreviewWidth = height;
                     rotatedPreviewHeight = width;
                     maxPreviewWidth = displaySize.y;
                     maxPreviewHeight = displaySize.x;
+                    viewWidth = this.getHeight();
+                    viewHeight = this.getWidth();
                 }
 
                 if (maxPreviewWidth > MAX_PREVIEW_WIDTH) {
@@ -287,14 +296,17 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                 // garbage capture data.
                 _previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
                         rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-                        maxPreviewHeight, targetSize);
+                        maxPreviewHeight);
+                Log.d(TAG, "_previewSize size: "+_previewSize.getWidth()+", "+_previewSize.getHeight());
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
                 int orientation = getResources().getConfiguration().orientation;
                 if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
                     this.setAspectRatio(_previewSize.getWidth(), _previewSize.getHeight());
+//                    this.setAspectRatio(rotatedPreviewWidth, rotatedPreviewHeight);
                 } else {
                     this.setAspectRatio(_previewSize.getHeight(), _previewSize.getWidth());
+//                    this.setAspectRatio(rotatedPreviewHeight, rotatedPreviewWidth);
                 }
 
                 // Check if the flash is supported.
@@ -318,13 +330,13 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         int targetIndex = 0;
         for (int i = 0; i < list.size(); i++) {
             Size size = list.get(i);
+            Log.d(TAG, "getNearestSizeByWidth size: "+size.getWidth()+", "+size.getHeight());
             if (Math.abs(size.getWidth() - targetWidth) < minOffset) {
                 minOffset = Math.abs(size.getWidth() - targetWidth);
                 targetIndex = i;
             }
         }
-        Size targetSize = list.get(targetIndex);
-        return targetSize;
+        return list.get(targetIndex);
     }
 
     static class CompareSizesByArea implements Comparator<Size> {
@@ -338,23 +350,18 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
     }
 
-    private static Size chooseOptimalSize(Size[] choices, int textureViewWidth, int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
-
+    private static Size chooseOptimalSize(Size[] choices, int textureViewWidth, int textureViewHeight, int maxWidth, int maxHeight) {
         // Collect the supported resolutions that are at least as big as the preview Surface
         List<Size> bigEnough = new ArrayList<>();
         // Collect the supported resolutions that are smaller than the preview Surface
         List<Size> notBigEnough = new ArrayList<>();
-        int w = aspectRatio.getWidth();
-        int h = aspectRatio.getHeight();
+        Log.d(TAG, "chooseOptimalSize args: "+textureViewWidth+", "+textureViewHeight+", "+maxWidth+", "+maxHeight);
         for (Size option : choices) {
-            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
-                    option.getHeight() == option.getWidth() * h / w) {
-                if (option.getWidth() >= textureViewWidth &&
-                        option.getHeight() >= textureViewHeight) {
-                    bigEnough.add(option);
-                } else {
-                    notBigEnough.add(option);
-                }
+            Log.d(TAG, "preview size option: ["+option.getWidth()+"]["+option.getHeight()+"]");
+            if (option.getWidth() >= textureViewWidth && option.getHeight() >= textureViewHeight) {
+                bigEnough.add(option);
+            } else {
+                notBigEnough.add(option);
             }
         }
 
@@ -416,7 +423,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
          */
         private final File mFile;
 
-        public ImageSaver(Image image, File file) {
+        private ImageSaver(Image image, File file) {
             mImage = image;
             mFile = file;
 //            Log.d(TAG,"ImageSaver  ImageSaver");
@@ -452,8 +459,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                     out.flush();
                     out.close();
                 }
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
@@ -468,7 +473,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     private CameraDevice.StateCallback _deviceStateCallback = new CameraDevice.StateCallback() {
 
         @Override
-        public void onOpened(CameraDevice cameraDevice) {
+        public void onOpened(@NonNull CameraDevice cameraDevice) {
             Log.d(TAG,"_deviceStateCallback onOpened.");
             _cameraOpenCloseLock.release();
             _cameraDevice = cameraDevice;
@@ -476,12 +481,12 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         }
 
         @Override
-        public void onDisconnected(CameraDevice cameraDevice) {
+        public void onDisconnected(@NonNull CameraDevice cameraDevice) {
 
         }
 
         @Override
-        public void onError(CameraDevice cameraDevice, int i) {
+        public void onError(@NonNull CameraDevice cameraDevice, int i) {
 
         }
     };
@@ -517,9 +522,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
                             // When the session is ready, we start displaying the preview.
                             _captureSession = cameraCaptureSession;
-                            if (null == _captureSession) {
-                                Log.e(TAG, "createCaptureSession onConfigured null == _captureSession");
-                            }
                             try {
                                 // Auto focus should be continuous for camera preview.
                                 _previewBuilder.set(CaptureRequest.CONTROL_AF_MODE,
@@ -532,7 +534,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                                 _captureSession.setRepeatingRequest(_previewRequest,
                                         _captureCallback, _msgHandler);
                             } catch (CameraAccessException e) {
-                                Log.e(TAG, "createCaptureSession onConfigured " + e.getStackTrace());
+                                Log.e(TAG, "createCaptureSession onConfigured " + e.toString());
                             }
                         }
 
@@ -720,10 +722,10 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     }
 
     private void closeCamera() {
+        Log.d(TAG, "closeCamera");
         try {
             _cameraOpenCloseLock.acquire();
             if (null != _captureSession) {
-                Log.e(TAG, "closeCamera");
                 _captureSession.close();
                 _captureSession = null;
             }
@@ -743,6 +745,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     }
 
     public void viewStart() {
+        Log.d(TAG, "viewStart");
         startBackgroundThread();
 
         // When the screen is turned off and turned back on, the SurfaceTexture is already
@@ -757,6 +760,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     }
 
     public void viewEnd() {
+        Log.d(TAG, "viewEnd");
         closeCamera();
         stopBackgroundThread();
     }
