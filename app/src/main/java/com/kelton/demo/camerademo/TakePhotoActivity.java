@@ -10,16 +10,17 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.View;
 import android.widget.Button;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
-import android.widget.Toast;
+
+import java.lang.ref.WeakReference;
 
 /**
  * Created by kelton on 16/10/9.
@@ -40,7 +41,6 @@ public class TakePhotoActivity extends Activity {
     private int _cameraViewY = 0;
     private int _cameraViewWidth = 0;
     private int _cameraViewHeight = 0;
-    private double _cameraViewScale = 0;
     private int _cameraViewMarkWidth = 0;
     private int _cameraViewMarkHeight = 0;
     private int _sizeMarkIndex = 1;
@@ -70,7 +70,6 @@ public class TakePhotoActivity extends Activity {
         _cameraViewHeight = _cameraViewMarkHeight;
         _cameraViewX = displaySize.x/2;
         _cameraViewY = displaySize.y/2;
-        _cameraViewScale = 1.5;
 
         Button btn;
 
@@ -130,8 +129,6 @@ public class TakePhotoActivity extends Activity {
         }
         if (null != _cameraTextureView) {
             _cameraTextureView.changeCamera();
-//            _cameraTextureView.changeSize();
-            return;
         }
     }
 
@@ -161,7 +158,6 @@ public class TakePhotoActivity extends Activity {
         }
         if (null != _cameraTextureView) {
             _cameraTextureView.changeSize();
-            return;
         }
     }
 
@@ -177,7 +173,6 @@ public class TakePhotoActivity extends Activity {
         }
         if (null != _cameraTextureView) {
             _cameraTextureView.takePhoto();
-            return;
         }
     }
 
@@ -212,28 +207,19 @@ public class TakePhotoActivity extends Activity {
     }
 
     private void showView() {
-//        _contentLayout = new RelativeLayout(this);
         _contentLayout = (RelativeLayout) findViewById(R.id.content_layout);
-//        RelativeLayout.LayoutParams layoutParams =
-//                new RelativeLayout.LayoutParams(
-//                        RelativeLayout.LayoutParams.MATCH_PARENT,
-//                        RelativeLayout.LayoutParams.MATCH_PARENT
-//                );
-
 
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Log.d(LOG_TAG, "use Texture view");
-            createTextureView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight, _cameraViewScale);
+            createTextureView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight);
         } else {
             Log.d(LOG_TAG, "use surface view");
-            createSurfaceView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight, _cameraViewScale);
+            createSurfaceView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight);
         }
-
-//        this.addContentView(_contentLayout, layoutParams);
     }
 
-    private void createSurfaceView(RelativeLayout rl, String savePath, int cameraViewX, int cameraViewY, int cameraViewWidth, int cameraViewHeight, double cameraViewScale) {
+    private void createSurfaceView(RelativeLayout rl, String savePath, int cameraViewX, int cameraViewY, int cameraViewWidth, int cameraViewHeight) {
         //        RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
         RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(cameraViewWidth, cameraViewHeight);
         //csViewParams.addRule(RelativeLayout.CENTER_HORIZONTAL);
@@ -251,7 +237,7 @@ public class TakePhotoActivity extends Activity {
         rl.addView(_cameraSurfaceView);
     }
 
-    private void createTextureView(final RelativeLayout rl, final String savePath, int cameraViewX, int cameraViewY, int cameraViewWidth, int cameraViewHeight, double cameraViewScale) {
+    private void createTextureView(final RelativeLayout rl, final String savePath, int cameraViewX, int cameraViewY, int cameraViewWidth, int cameraViewHeight) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // android above M makes some changes in granted permissions on run-time application
             if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -263,51 +249,49 @@ public class TakePhotoActivity extends Activity {
             }
         }
 
-        Handler msgHandler = new Handler() {
-            public void handleMessage (Message msg) {//此方法在ui线程运行
-                switch(msg.what) {
-                    case CameraTextureView.SAVED_SUCCESS:
-                        Log.d(LOG_TAG, "takePhotoView CameraTextureView handleMessage SAVED_SUCCESS");
-//                        _cameraTextViewPhotoSaved = true;
-//                        MainActivity.this.removeTakePhotoView(null);
-                        updateImageView();
-                        break;
-                }
-            }
-        };
+        MsgHandler msgHandler = new MsgHandler(this);
 
         RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(cameraViewWidth, cameraViewHeight);
-//        RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);
         _cameraTextureView = new CameraTextureView(this, savePath, msgHandler);
-//        _cameraTextureView.setMinimumWidth(viewWidth);
-//        _cameraTextureView.setMinimumHeight(viewHeight);
-//        _cameraTextureView.setScaleX(scale);
-//        _cameraTextureView.setScaleY(scale);
-//        _cameraTextureView.setMinimumWidth();
-//        csViewParams.addRule(RelativeLayout.CENTER_HORIZONTAL);
-//        csViewParams.addRule(RelativeLayout.CENTER_VERTICAL);
         _cameraTextureView.setX(cameraViewX - cameraViewWidth / 2);
         _cameraTextureView.setY(cameraViewY - cameraViewHeight / 2);
-//        _cameraTextureView.setX(0);
-//        _cameraTextureView.setY(0);
         _cameraTextureView.setLayoutParams(csViewParams);
-        // very important!!!!!!! must add, or while in cocos2dx, the csView cannot show(will render the glsurfaceView content)
-//        _textureView.setZOrderMediaOverlay(true);
         _cameraTextureView.bringToFront();
         _cameraTextureView.requestLayout();
         _cameraTextureView.requestFocus();
-        //
+
         rl.addView(_cameraTextureView);
     }
 
+    static class MsgHandler extends Handler {
+        WeakReference<TakePhotoActivity> outerClass;
+
+        MsgHandler(TakePhotoActivity activity) {
+            outerClass = new WeakReference<>(activity);
+        }
+        public void handleMessage (Message msg) {//此方法在ui线程运行
+            TakePhotoActivity ac = outerClass.get();
+            switch(msg.what) {
+                case CameraTextureView.SAVED_SUCCESS:
+                    ac.saveImageSuccessCallback();
+                    break;
+            }
+        }
+    }
+
+    private void saveImageSuccessCallback() {
+        Utils.showTip(this, " texture view save image success");
+        updateImageView();
+    }
+
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         Log.d(LOG_TAG, "requestCode: "+requestCode);
         switch (requestCode) {
             case  REQUEST_CAMERA_RESULT:
                 Log.d(LOG_TAG, "grantResults[0]: "+grantResults[0]);
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    createTextureView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight, _cameraViewScale);
+                    createTextureView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight);
                 } else {
                     Utils.showTip(this, "cannot use camera service without permission granted");
                 }

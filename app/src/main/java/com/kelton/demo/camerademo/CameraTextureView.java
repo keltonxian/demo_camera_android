@@ -61,7 +61,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     private int _ratioWidth = 0;
     private int _ratioHeight = 0;
 
-    private String _savePath = null;
     private File _saveFile = null;
 
     private String _cameraId = null;
@@ -86,16 +85,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
     private int _cameraFace = CameraCharacteristics.LENS_FACING_BACK;//FRONT;
 
-    /**
-     * Max preview width that is guaranteed by Camera2 API
-     */
-    private static final int MAX_PREVIEW_WIDTH = 1920;
-
-    /**
-     * Max preview height that is guaranteed by Camera2 API
-     */
-    private static final int MAX_PREVIEW_HEIGHT = 1080;
-
     private Size _previewSize;
 
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
@@ -111,11 +100,13 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
         this._context = context;
         this._msgHandler = handler;
-
-        this._savePath = savePath;
-        this._saveFile = new File(this._savePath);
+        this._saveFile = new File(savePath);
 
         viewStart();
+    }
+
+    public CameraTextureView(Context context) {
+        super(context);
     }
 
     @Override
@@ -180,8 +171,8 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
             Log.d(TAG, "onMeasure 1-->: "+width+","+height);
             setMeasuredDimension(width, height);
         } else {
-            int d_width = 0;
-            int d_height = 0;
+            int d_width;
+            int d_height;
             if (width / height >= _ratioWidth / _ratioHeight) {
                 d_width = width;
                 d_height = width * _ratioHeight / _ratioWidth;
@@ -274,35 +265,18 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
                 Point displaySize = new Point();
                 activity.getWindowManager().getDefaultDisplay().getSize(displaySize);
-                int rotatedPreviewWidth = width;
-                int rotatedPreviewHeight = height;
-                int maxPreviewWidth = displaySize.x;
-                int maxPreviewHeight = displaySize.y;
+                int pw = width;
+                int ph = height;
 
                 if (swappedDimensions) {
-                    rotatedPreviewWidth = height;
-                    rotatedPreviewHeight = width;
-                    maxPreviewWidth = displaySize.y;
-                    maxPreviewHeight = displaySize.x;
-                }
-
-                if (maxPreviewWidth > MAX_PREVIEW_WIDTH) {
-                    maxPreviewWidth = MAX_PREVIEW_WIDTH;
-                }
-
-                if (maxPreviewHeight > MAX_PREVIEW_HEIGHT) {
-                    maxPreviewHeight = MAX_PREVIEW_HEIGHT;
+                    pw = height;
+                    ph = width;
                 }
 
                 // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
                 // bus' bandwidth limitation, resulting in gorgeous previews but the storage of
                 // garbage capture data.
-//                _previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
-//                        rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-//                        maxPreviewHeight);
-                _previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
-                        rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-                        maxPreviewHeight);
+                _previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class), pw, ph);
                 Log.d(TAG, "_previewSize size: "+_previewSize.getWidth()+", "+_previewSize.getHeight());
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
@@ -322,10 +296,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
             }
         } catch (CameraAccessException e) {
             e.printStackTrace();
-        } catch (NullPointerException e) {
-            // Currently an NPE is thrown when the Camera2API is used but not supported on the
-            // device this code runs.
-//            ErrorDialog.newInstance(getString(R.string.camera_error)) .show(getChildFragmentManager(), FRAGMENT_DIALOG);
         }
     }
 
@@ -354,12 +324,12 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
     }
 
-    private static Size chooseOptimalSize(Size[] choices, int textureViewWidth, int textureViewHeight, int maxWidth, int maxHeight) {
+    private static Size chooseOptimalSize(Size[] choices, int textureViewWidth, int textureViewHeight) {
         // Collect the supported resolutions that are at least as big as the preview Surface
         List<Size> bigEnough = new ArrayList<>();
         // Collect the supported resolutions that are smaller than the preview Surface
         List<Size> notBigEnough = new ArrayList<>();
-//        Log.d(TAG, "chooseOptimalSize args: "+textureViewWidth+", "+textureViewHeight+", "+maxWidth+", "+maxHeight);
+//        Log.d(TAG, "chooseOptimalSize args: "+textureViewWidth+", "+textureViewHeight);
         for (Size option : choices) {
 //            Log.d(TAG, "preview size option: ["+option.getWidth()+"]["+option.getHeight()+"]");
             if (option.getWidth() >= textureViewWidth && option.getHeight() >= textureViewHeight) {
