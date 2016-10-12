@@ -3,6 +3,8 @@ package com.kelton.demo.camerademo;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.os.Build;
 import android.os.Bundle;
@@ -14,6 +16,8 @@ import android.util.Log;
 import android.view.Display;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
@@ -28,6 +32,7 @@ public class TakePhotoActivity extends Activity {
     private final static int SIZE_MAKE_MAX = 3;
 
     private String _photoSavePath = null;
+    private ImageView _imageView = null;
     private RelativeLayout _contentLayout = null;
     private CameraSurfaceView _cameraSurfaceView = null;
     private CameraTextureView _cameraTextureView = null;
@@ -47,7 +52,6 @@ public class TakePhotoActivity extends Activity {
 
         _photoSavePath = this.getFilesDir() + "/take_photo_saved_image.png";
 
-
         Point displaySize = new Point();
         Display display = getWindowManager().getDefaultDisplay();
         display.getSize(displaySize);
@@ -60,8 +64,8 @@ public class TakePhotoActivity extends Activity {
 
         _cameraViewMarkWidth = displaySize.x/2;
         _cameraViewMarkHeight = displaySize.y/2;
-        _cameraViewMarkWidth = displaySize.x;
-        _cameraViewMarkHeight = displaySize.y;
+//        _cameraViewMarkWidth = displaySize.x;
+//        _cameraViewMarkHeight = displaySize.y;
         _cameraViewWidth = _cameraViewMarkWidth;
         _cameraViewHeight = _cameraViewMarkHeight;
         _cameraViewX = displaySize.x/2;
@@ -103,6 +107,8 @@ public class TakePhotoActivity extends Activity {
         });
 
         showView();
+
+        addImageView();
     }
 
     private void returnToMain() {
@@ -124,6 +130,7 @@ public class TakePhotoActivity extends Activity {
         }
         if (null != _cameraTextureView) {
             _cameraTextureView.changeCamera();
+//            _cameraTextureView.changeSize();
             return;
         }
     }
@@ -142,10 +149,20 @@ public class TakePhotoActivity extends Activity {
             _cameraViewWidth = displaySize.x;
             _cameraViewHeight = displaySize.y;
         }
+//        Log.d(LOG_TAG, "changeSize: "+_cameraViewWidth+", "+_cameraViewHeight);
         RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(_cameraViewWidth, _cameraViewHeight);
         _cameraTextureView.setX(_cameraViewX - _cameraViewWidth / 2);
         _cameraTextureView.setY(_cameraViewY - _cameraViewHeight / 2);
         _cameraTextureView.setLayoutParams(csViewParams);
+//        Log.d(LOG_TAG, "changeSize textureView size: "+_cameraTextureView.getLayoutParams().width+", "+_cameraTextureView.getLayoutParams().height);
+        if (null != _cameraSurfaceView) {
+//            _cameraSurfaceView.changeSize();
+            return;
+        }
+        if (null != _cameraTextureView) {
+            _cameraTextureView.changeSize();
+            return;
+        }
     }
 
     private void capture() {
@@ -162,6 +179,36 @@ public class TakePhotoActivity extends Activity {
             _cameraTextureView.takePhoto();
             return;
         }
+    }
+
+    private void addImageView() {
+        RelativeLayout layout = new RelativeLayout(this);
+        RelativeLayout.LayoutParams layoutParams =
+                new RelativeLayout.LayoutParams(
+                        RelativeLayout.LayoutParams.MATCH_PARENT,
+                        RelativeLayout.LayoutParams.MATCH_PARENT
+                );
+        layout.setLayoutParams(layoutParams);
+        _imageView = new ImageView(this);
+
+        layout.addView(_imageView);
+        this.addContentView(layout, layoutParams);
+        updateImageView();
+    }
+
+    private void updateImageView() {
+        Point displaySize = new Point();
+        Display display = getWindowManager().getDefaultDisplay();
+        display.getSize(displaySize);
+        Bitmap bitMap = BitmapFactory.decodeFile(_photoSavePath);
+        int width = bitMap.getWidth();
+        int height = bitMap.getHeight();
+        float scale = 0.5f;
+        _imageView.setImageBitmap(bitMap);
+        _imageView.setScaleX(scale);
+        _imageView.setScaleY(scale);
+        _imageView.setX(displaySize.x - (width * scale) / 2 * 3);
+        _imageView.setY(displaySize.y - (height * scale) / 2 * 3);
     }
 
     private void showView() {
@@ -223,15 +270,11 @@ public class TakePhotoActivity extends Activity {
                         Log.d(LOG_TAG, "takePhotoView CameraTextureView handleMessage SAVED_SUCCESS");
 //                        _cameraTextViewPhotoSaved = true;
 //                        MainActivity.this.removeTakePhotoView(null);
+                        updateImageView();
                         break;
                 }
             }
         };
-
-//        viewWidth = viewWidth * (int)scale;
-//        viewHeight = viewHeight * (int)scale;
-//        viewWidth = 910;
-//        viewHeight = 940;
 
         RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(cameraViewWidth, cameraViewHeight);
 //        RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);

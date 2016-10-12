@@ -84,7 +84,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     private static final int STATE_PICTURE_TAKEN = 4;
     private int _state = STATE_PREVIEW;
 
-    private int _cameraFace = CameraCharacteristics.LENS_FACING_FRONT;
+    private int _cameraFace = CameraCharacteristics.LENS_FACING_BACK;//FRONT;
 
     /**
      * Max preview width that is guaranteed by Camera2 API
@@ -175,15 +175,22 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
-        Log.d(TAG, "onMeasure: "+_ratioWidth+","+_ratioHeight+","+width+","+height);
+//        Log.d(TAG, "func onMeasure: "+_ratioWidth+","+_ratioHeight+","+width+","+height);
         if (0 == _ratioWidth || 0 == _ratioHeight) {
+            Log.d(TAG, "onMeasure 1-->: "+width+","+height);
             setMeasuredDimension(width, height);
         } else {
+            int d_width = 0;
+            int d_height = 0;
             if (width / height >= _ratioWidth / _ratioHeight) {
-                setMeasuredDimension(width, width * _ratioHeight / _ratioWidth);
+                d_width = width;
+                d_height = width * _ratioHeight / _ratioWidth;
             } else {
-                setMeasuredDimension(height * _ratioWidth / _ratioHeight, height);
+                d_width = height * _ratioWidth / _ratioHeight;
+                d_height = height;
             }
+//            Log.d(TAG, "onMeasure 2-->: "+d_width+","+d_height);
+            setMeasuredDimension(d_width, d_height);
         }
     }
 
@@ -271,16 +278,12 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                 int rotatedPreviewHeight = height;
                 int maxPreviewWidth = displaySize.x;
                 int maxPreviewHeight = displaySize.y;
-                int viewWidth = this.getWidth();
-                int viewHeight = this.getHeight();
 
                 if (swappedDimensions) {
                     rotatedPreviewWidth = height;
                     rotatedPreviewHeight = width;
                     maxPreviewWidth = displaySize.y;
                     maxPreviewHeight = displaySize.x;
-                    viewWidth = this.getHeight();
-                    viewHeight = this.getWidth();
                 }
 
                 if (maxPreviewWidth > MAX_PREVIEW_WIDTH) {
@@ -294,6 +297,9 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                 // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
                 // bus' bandwidth limitation, resulting in gorgeous previews but the storage of
                 // garbage capture data.
+//                _previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
+//                        rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
+//                        maxPreviewHeight);
                 _previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
                         rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
                         maxPreviewHeight);
@@ -303,10 +309,8 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
                 int orientation = getResources().getConfiguration().orientation;
                 if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
                     this.setAspectRatio(_previewSize.getWidth(), _previewSize.getHeight());
-//                    this.setAspectRatio(rotatedPreviewWidth, rotatedPreviewHeight);
                 } else {
                     this.setAspectRatio(_previewSize.getHeight(), _previewSize.getWidth());
-//                    this.setAspectRatio(rotatedPreviewHeight, rotatedPreviewWidth);
                 }
 
                 // Check if the flash is supported.
@@ -330,7 +334,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         int targetIndex = 0;
         for (int i = 0; i < list.size(); i++) {
             Size size = list.get(i);
-            Log.d(TAG, "getNearestSizeByWidth size: "+size.getWidth()+", "+size.getHeight());
+//            Log.d(TAG, "getNearestSizeByWidth size: "+size.getWidth()+", "+size.getHeight());
             if (Math.abs(size.getWidth() - targetWidth) < minOffset) {
                 minOffset = Math.abs(size.getWidth() - targetWidth);
                 targetIndex = i;
@@ -355,9 +359,9 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         List<Size> bigEnough = new ArrayList<>();
         // Collect the supported resolutions that are smaller than the preview Surface
         List<Size> notBigEnough = new ArrayList<>();
-        Log.d(TAG, "chooseOptimalSize args: "+textureViewWidth+", "+textureViewHeight+", "+maxWidth+", "+maxHeight);
+//        Log.d(TAG, "chooseOptimalSize args: "+textureViewWidth+", "+textureViewHeight+", "+maxWidth+", "+maxHeight);
         for (Size option : choices) {
-            Log.d(TAG, "preview size option: ["+option.getWidth()+"]["+option.getHeight()+"]");
+//            Log.d(TAG, "preview size option: ["+option.getWidth()+"]["+option.getHeight()+"]");
             if (option.getWidth() >= textureViewWidth && option.getHeight() >= textureViewHeight) {
                 bigEnough.add(option);
             } else {
@@ -745,7 +749,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     }
 
     public void viewStart() {
-        Log.d(TAG, "viewStart");
         startBackgroundThread();
 
         // When the screen is turned off and turned back on, the SurfaceTexture is already
@@ -753,7 +756,10 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
         if (this.isAvailable()) {
-            openCamera(this.getWidth(), this.getHeight());
+            int width = this.getLayoutParams().width;
+            int height = this.getLayoutParams().height;
+            Log.d(TAG, "viewStart size: "+width+", "+height);
+            openCamera(width, height);
         } else {
             this.setSurfaceTextureListener(this);
         }
@@ -771,6 +777,11 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
 
     public void changeCamera() {
         _cameraFace = _cameraFace == CameraCharacteristics.LENS_FACING_FRONT?CameraCharacteristics.LENS_FACING_BACK:CameraCharacteristics.LENS_FACING_FRONT;
+        viewEnd();
+        viewStart();
+    }
+
+    public void changeSize() {
         viewEnd();
         viewStart();
     }
