@@ -12,7 +12,6 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.View;
@@ -112,7 +111,7 @@ public class TakePhotoActivity extends Activity {
 
     private void returnToMain() {
         if (null != _cameraSurfaceView) {
-//            _cameraSurfaceView.close();
+            _cameraSurfaceView.close();
         }
         if (null != _cameraTextureView) {
             _cameraTextureView.close();
@@ -148,27 +147,27 @@ public class TakePhotoActivity extends Activity {
         }
 //        Log.d(LOG_TAG, "changeSize: "+_cameraViewWidth+", "+_cameraViewHeight);
         RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(_cameraViewWidth, _cameraViewHeight);
-        _cameraTextureView.setX(_cameraViewX - _cameraViewWidth / 2);
-        _cameraTextureView.setY(_cameraViewY - _cameraViewHeight / 2);
-        _cameraTextureView.setLayoutParams(csViewParams);
-//        Log.d(LOG_TAG, "changeSize textureView size: "+_cameraTextureView.getLayoutParams().width+", "+_cameraTextureView.getLayoutParams().height);
         if (null != _cameraSurfaceView) {
-//            _cameraSurfaceView.changeSize();
+            _cameraSurfaceView.setX(_cameraViewX - _cameraViewWidth / 2);
+            _cameraSurfaceView.setY(_cameraViewY - _cameraViewHeight / 2);
+            _cameraSurfaceView.setLayoutParams(csViewParams);
+            _cameraSurfaceView.changeSize();
             return;
         }
         if (null != _cameraTextureView) {
+            _cameraTextureView.setX(_cameraViewX - _cameraViewWidth / 2);
+            _cameraTextureView.setY(_cameraViewY - _cameraViewHeight / 2);
+            _cameraTextureView.setLayoutParams(csViewParams);
+//        Log.d(LOG_TAG, "changeSize textureView size: "+_cameraTextureView.getLayoutParams().width+", "+_cameraTextureView.getLayoutParams().height);
             _cameraTextureView.changeSize();
         }
     }
 
     private void capture() {
+        Log.d(LOG_TAG, "capture");
         if (null != _cameraSurfaceView) {
-//            _cameraSurfaceView.takePhoto(new Camera.PictureCallback() {
-//                @Override
-//                public void onPictureTaken(byte[] data, Camera camera) {
-//                    MainActivity.this.removeTakePhotoView(data);
-//                }
-//            });
+            Log.d(LOG_TAG, "_cameraSurfaceView");
+            _cameraSurfaceView.takePhoto();
             return;
         }
         if (null != _cameraTextureView) {
@@ -196,8 +195,12 @@ public class TakePhotoActivity extends Activity {
         Display display = getWindowManager().getDefaultDisplay();
         display.getSize(displaySize);
         Bitmap bitMap = BitmapFactory.decodeFile(_photoSavePath);
+        if (null == bitMap) {
+            return;
+        }
         int width = bitMap.getWidth();
         int height = bitMap.getHeight();
+        Log.d(LOG_TAG, " save image bitmap size: ["+width+"]["+height+"]");
         float scale = 0.5f;
         _imageView.setImageBitmap(bitMap);
         _imageView.setScaleX(scale);
@@ -213,27 +216,24 @@ public class TakePhotoActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Log.d(LOG_TAG, "use Texture view");
             createTextureView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight);
+            Utils.showTip(this, "Use Texture View");
         } else {
             Log.d(LOG_TAG, "use surface view");
             createSurfaceView(_contentLayout, _photoSavePath, _cameraViewX, _cameraViewY, _cameraViewWidth, _cameraViewHeight);
+            Utils.showTip(this, "Use Surface View");
         }
     }
 
     private void createSurfaceView(RelativeLayout rl, String savePath, int cameraViewX, int cameraViewY, int cameraViewWidth, int cameraViewHeight) {
-        //        RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        MsgHandler msgHandler = new MsgHandler(this);
+
         RelativeLayout.LayoutParams csViewParams = new RelativeLayout.LayoutParams(cameraViewWidth, cameraViewHeight);
-        //csViewParams.addRule(RelativeLayout.CENTER_HORIZONTAL);
-        //csViewParams.addRule(RelativeLayout.CENTER_VERTICAL);
-        _cameraSurfaceView = new CameraSurfaceView(this);
-        //csView.setX(cameraViewTransformTranslateX-viewWidth/2);
-        //csView.setY(cameraViewTransformTranslateY-viewHeight/2);
-//        _cameraSurfaceView.setX(cameraViewTransformTranslateX);
-//        _cameraSurfaceView.setY(cameraViewTransformTranslateY);
+        _cameraSurfaceView = new CameraSurfaceView(this, savePath, msgHandler);
         _cameraSurfaceView.setX(cameraViewX - cameraViewWidth / 2);
         _cameraSurfaceView.setY(cameraViewY - cameraViewHeight / 2);
-        //Log.d(LOG_TAG, "===== csView: x:"+csView.getX()+", y:"+csView.getY());
         _cameraSurfaceView.setLayoutParams(csViewParams);
         _cameraSurfaceView.setZOrderMediaOverlay(true);
+
         rl.addView(_cameraSurfaceView);
     }
 
@@ -275,12 +275,15 @@ public class TakePhotoActivity extends Activity {
                 case CameraTextureView.SAVED_SUCCESS:
                     ac.saveImageSuccessCallback();
                     break;
+                case CameraSurfaceView.SAVED_SUCCESS:
+                    ac.saveImageSuccessCallback();
+                    break;
             }
         }
     }
 
     private void saveImageSuccessCallback() {
-        Utils.showTip(this, " texture view save image success");
+        Utils.showTip(this, "saveImageSuccessCallback");
         updateImageView();
     }
 

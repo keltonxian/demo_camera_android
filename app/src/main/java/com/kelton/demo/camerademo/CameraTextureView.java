@@ -118,7 +118,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
         Log.d(TAG, "onSurfaceTextureSizeChanged width["+width+"], height["+height+"]");
-        configureTransform(width, height);
+//        configureTransform(width, height);
     }
 
     @Override
@@ -188,7 +188,6 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     private void openCamera(int width, int height) {
         Log.d(TAG, "openCamera size: "+width+","+height);
         setUpCameraOutputs(width, height);
-        configureTransform(width, height);
         Activity activity = (Activity)this._context;
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
