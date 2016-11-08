@@ -5,7 +5,13 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.PointF;
+import android.graphics.Rect;
+import android.media.FaceDetector;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -207,6 +213,8 @@ public class TakePhotoActivity extends Activity {
         _imageView.setScaleY(scale);
         _imageView.setX(displaySize.x - (width * scale) / 2 * 3);
         _imageView.setY(displaySize.y - (height * scale) / 2 * 3);
+
+        detectFace(bitMap);
     }
 
     private void showView() {
@@ -302,6 +310,58 @@ public class TakePhotoActivity extends Activity {
             default:
                 super.onRequestPermissionsResult(requestCode, permissions, grantResults);
                 break;
+        }
+    }
+
+    private boolean checkFace(Rect rect){
+        int w = rect.width();
+        int h = rect.height();
+        int s = w*h;
+        Log.d(LOG_TAG, "checkFace width[" + w + "], height[" + h + "], area[" + s + "]");
+        if(s < 10000){
+            Log.d(LOG_TAG, "checkFace invalid face");
+            return false;
+        }
+        else{
+            Log.d(LOG_TAG, "checkFace valid face");
+            return true;
+        }
+    }
+
+    private void detectFace(Bitmap bitmap) {
+        Bitmap srcFace = bitmap.copy(Bitmap.Config.RGB_565, true);
+        int width = srcFace.getWidth();
+        int height = srcFace.getHeight();
+        Log.d(LOG_TAG, "detectFace: width = " + width + "height = " + height);
+
+        int MAX_DETECT_FACE = 2;
+        FaceDetector faceDetector = new FaceDetector(width, height, MAX_DETECT_FACE);
+        FaceDetector.Face[] faceArray = new FaceDetector.Face[MAX_DETECT_FACE];
+
+        int totalFace = faceDetector.findFaces(srcFace, faceArray);
+        Log.d(LOG_TAG, "detectFace total[" + totalFace + "]");
+        for(int i = 0; i < totalFace; i++){
+            FaceDetector.Face f  = faceArray[i];
+            PointF midPoint = new PointF();
+            float dis = f.eyesDistance();
+            f.getMidPoint(midPoint);
+            int dd = (int)(dis);
+            Point eyeLeft = new Point((int)(midPoint.x - dis/2), (int)midPoint.y);
+            Point eyeRight = new Point((int)(midPoint.x + dis/2), (int)midPoint.y);
+            Rect faceRect = new Rect((int)(midPoint.x - dd), (int)(midPoint.y - dd), (int)(midPoint.x + dd), (int)(midPoint.y + dd));
+//            Log.d(LOG_TAG, "left eye x = " + eyeLeft.x + "y = " + eyeLeft.y);
+            if(checkFace(faceRect)){
+                Canvas canvas = new Canvas(srcFace);
+                Paint p = new Paint();
+                p.setAntiAlias(true);
+                p.setStrokeWidth(8);
+                p.setStyle(Paint.Style.STROKE);
+                p.setColor(Color.RED);
+                canvas.drawCircle(eyeLeft.x, eyeLeft.y, 20, p);
+                canvas.drawCircle(eyeRight.x, eyeRight.y, 20, p);
+                canvas.drawRect(faceRect, p);
+                _imageView.setImageBitmap(srcFace);
+            }
         }
     }
 }

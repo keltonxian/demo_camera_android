@@ -168,7 +168,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         int height = MeasureSpec.getSize(heightMeasureSpec);
 //        Log.d(TAG, "func onMeasure: "+_ratioWidth+","+_ratioHeight+","+width+","+height);
         if (0 == _ratioWidth || 0 == _ratioHeight) {
-            Log.d(TAG, "onMeasure 1-->: "+width+","+height);
+//            Log.d(TAG, "onMeasure 1-->: "+width+","+height);
             setMeasuredDimension(width, height);
         } else {
             int d_width;
