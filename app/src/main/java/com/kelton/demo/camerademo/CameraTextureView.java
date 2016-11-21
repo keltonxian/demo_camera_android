@@ -83,7 +83,7 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
     private static final int STATE_PICTURE_TAKEN = 4;
     private int _state = STATE_PREVIEW;
 
-    private int _cameraFace = CameraCharacteristics.LENS_FACING_BACK;//FRONT;
+    private int _cameraFace = CameraCharacteristics.LENS_FACING_FRONT;
 
     private Size _previewSize;
 
@@ -375,12 +375,16 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
         this.setTransform(matrix);
     }
 
+    private boolean isFrontCamera() {
+        return _cameraFace == CameraCharacteristics.LENS_FACING_FRONT;
+    }
+
     private final ImageReader.OnImageAvailableListener _onImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {
 
         @Override
         public void onImageAvailable(ImageReader reader) {
-            _msgHandler.post(new ImageSaver(reader.acquireNextImage(), _saveFile));
+            _msgHandler.post(new ImageSaver(reader.acquireNextImage(), _saveFile, isFrontCamera()));
         }
 
     };
@@ -396,9 +400,12 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
          */
         private final File mFile;
 
-        private ImageSaver(Image image, File file) {
+        private boolean _isFrontCamera;
+
+        private ImageSaver(Image image, File file, boolean isFrontCamera) {
             mImage = image;
             mFile = file;
+            _isFrontCamera = isFrontCamera;
 //            Log.d(TAG,"ImageSaver  ImageSaver");
         }
 
@@ -409,6 +416,12 @@ public class CameraTextureView extends TextureView implements TextureView.Surfac
             byte[] bytes = new byte[buffer.remaining()];
             buffer.get(bytes);
             Bitmap bm = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+
+            if (true == _isFrontCamera) {
+                Matrix matrix = new Matrix();
+                matrix.preScale(-1.0f, 1.0f);
+                bm = Bitmap.createBitmap(bm, 0, 0, bm.getWidth(), bm.getHeight(), matrix, false);
+            }
 //            FileOutputStream output = null;
 //            try {
 //                output = new FileOutputStream(mFile);

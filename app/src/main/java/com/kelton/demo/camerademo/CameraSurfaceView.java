@@ -27,8 +27,8 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 
     private static final int FACE_BACK_ROTATION = 90;
     private static final int FACE_FRONT_ROTATION = 90;
-	private static final int CAMERA_BACK  = 0;
-	private static final int CAMERA_FRONT = 1;
+	private static final int CAMERA_BACK  = Camera.CameraInfo.CAMERA_FACING_BACK;
+    private static final int CAMERA_FRONT = Camera.CameraInfo.CAMERA_FACING_FRONT;
 
     public static final int SAVED_SUCCESS = 2;
 
@@ -44,7 +44,7 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
         this._msgHandler = handler;
         this._saveFile = new File(savePath);
 
-        initVars();
+        // initVars();
 		setupCameraAndHolder();
     }
 
